@@ -13,12 +13,6 @@ services:
     env_file:
       - .env
 
-    # To verify clients with a local tailscaled instead of an admission URL:
-    # environment:
-    #   DERP_VERIFY_CLIENTS: "true"
-    # volumes:
-    #   - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
-
     volumes:
       # Certificate sources (read-only).
       - ./certs:/certs:ro
@@ -33,5 +27,5 @@ services:
 
     # Bridge-network fallback (not recommended: source IPs are NATed):
     # ports:
-    #   - "443:443/tcp"     # or your DERP_ADDR port
+    #   - "8443:8443/tcp"   # or your DERP_ADDRESS port
     #   - "3478:3478/udp"

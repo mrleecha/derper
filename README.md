@@ -13,12 +13,12 @@ Published to GHCR as **`ghcr.io/mrleecha/derper`**.
   key; the entrypoint copies them to the filenames `derper` expects.
 - **No ACME, no Let's Encrypt, no HTTP `:80` listener.** Obtain certificates with
   `acme.sh`, `certbot`, Caddy, or your existing PKI.
-- **Minimal configuration.** Three required environment variables, seven optional.
+- **Minimal configuration.** Three required environment variables, six optional.
   Everything else uses safe, fixed defaults.
 - **Pinned and reproducible.** Tailscale `v1.104.5`, Go `1.27.3`, Alpine `3.24`.
   Multi-arch: `linux/amd64`, `linux/arm64`.
-- **Client verification.** Headscale-compatible admission control or a local
-  tailscaled, fail-closed by default.
+- **Client verification.** Headscale-compatible admission control, fail-closed
+  by default.
 
 The image contains the upstream `tailscale.com/cmd/derper` binary plus a small
 entrypoint. It is not affiliated with Tailscale Inc.
@@ -45,6 +45,7 @@ Create `/srv/derper/.env`:
 DERP_HOSTNAME=derp.example.com
 DERP_CERT_FILE=/certs/fullchain.cer
 DERP_KEY_FILE=/certs/derp.example.com.key
+DERP_ADDRESS=:8443
 ```
 
 Create `/srv/derper/compose.yaml`:
@@ -75,7 +76,7 @@ docker compose logs -f derper
 Verify:
 
 ```bash
-curl -fsS https://derp.example.com/derp/probe
+curl -fsS https://derp.example.com:8443/derp/probe
 ```
 
 HTTP `200` with an empty body means the server is healthy.
@@ -89,6 +90,7 @@ docker run -d --name derper --network host --restart unless-stopped \
   -e DERP_HOSTNAME=derp.example.com \
   -e DERP_CERT_FILE=/certs/fullchain.cer \
   -e DERP_KEY_FILE=/certs/derp.example.com.key \
+  -e DERP_ADDRESS=:8443 \
   -v /srv/derper/certs:/certs:ro \
   -v /srv/derper/data:/var/lib/derper \
   ghcr.io/mrleecha/derper:latest
@@ -120,12 +122,8 @@ unchanged.
 
 ## Client verification
 
-There are two supported mechanisms. Either one is enough to keep other tailnets
-off your server.
-
-### Admission controller (Headscale)
-
-For Headscale, the endpoint is `/verify`:
+To prevent other tailnets from using your DERP server, point it at an admission
+controller. For Headscale, the endpoint is `/verify`:
 
 ```yaml
 environment:
@@ -140,26 +138,8 @@ environment:
 - The controller must be reachable from the container (HTTPS recommended). The
   image includes `ca-certificates`.
 
-### Local tailscaled
-
-Set `DERP_VERIFY_CLIENTS=true` and mount the tailscaled socket into the
-container. The default socket path is `/var/run/tailscale/tailscaled.sock`:
-
-```yaml
-environment:
-  DERP_VERIFY_CLIENTS: "true"
-volumes:
-  - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
-```
-
-Use a different socket path with
-`DERP_EXTRA_ARGS: "--socket=/path/to/tailscaled.sock"`.
-
-If both `DERP_VERIFY_CLIENTS` and `DERP_VERIFY_CLIENT_URL` are set, both checks
-must pass.
-
-If neither is configured, **anyone** who knows the address can add this DERP to
-their own DERP map. The entrypoint logs a warning in this case.
+If `DERP_VERIFY_CLIENT_URL` is empty, **anyone** who knows the address can add
+this DERP to their own DERP map. The entrypoint logs a warning in this case.
 
 ## Configuration
 
@@ -170,10 +150,9 @@ their own DERP map. The entrypoint logs a warning in this case.
 | `DERP_HOSTNAME` | yes | — | TLS hostname; must match the certificate |
 | `DERP_CERT_FILE` | yes | — | Container path to the certificate chain (PEM) |
 | `DERP_KEY_FILE` | yes | — | Container path to the private key (PEM) |
-| `DERP_ADDR` | no | `:443` | HTTPS listen address (`:443`, `:8443`, `1.2.3.4:443`) |
+| `DERP_ADDRESS` | no | `:8443` | HTTPS listen address (`:8443`, `:443`, `1.2.3.4:8443`) |
 | `DERP_STUN` | no | `true` | Run the STUN server |
 | `DERP_STUN_PORT` | no | `3478` | STUN UDP port |
-| `DERP_VERIFY_CLIENTS` | no | `false` | Verify clients through a local tailscaled |
 | `DERP_VERIFY_CLIENT_URL` | no | empty | Admission controller URL (e.g. Headscale `/verify`) |
 | `DERP_VERIFY_CLIENT_URL_FAIL_OPEN` | no | `false` | Allow clients if the controller is unreachable |
 | `DERP_EXTRA_ARGS` | no | empty | Extra `derper` flags, space-separated; appended last |
@@ -190,6 +169,7 @@ fixed flags below.
 | `--certdir` | `/var/lib/derper/certs` |
 | `--http-port` | `-1` (no HTTP `:80` listener) |
 | `--derp` | `true` |
+| `--verify-clients` | `false` |
 | `-c` | `/var/lib/derper/derper.key` |
 
 There is no HTTP listener because this image is manual-cert only: ACME HTTP-01
@@ -213,15 +193,16 @@ container is recreated.
 
 | Port | Protocol | Purpose |
 |---|---|---|
-| `DERP_ADDR` (default `443`) | TCP | DERP over HTTPS |
+| `DERP_ADDRESS` (default `8443`) | TCP | DERP over HTTPS |
 | `DERP_STUN_PORT` (default `3478`) | UDP | STUN |
 
 - `network_mode: host` is recommended. DERP identifies clients by source IP, and
   Docker bridge port mapping performs SNAT. Tailscale also requires custom DERP
   servers to be directly reachable, not behind NAT or a load balancer.
 - Allow inbound and outbound **ICMP**.
-- If port 443 is already used by Caddy/Nginx, set `DERP_ADDR=:8443` and expose
-  `8443/tcp` instead. Put `derpport: 8443` in the DERP map.
+- The default HTTPS port is `8443` because `443` is often already used by
+  Caddy/Nginx. To use the standard port, set `DERP_ADDRESS=:443`. The port you
+  choose must match `derpport` in the DERP map.
 - Use a firewall to allow only the ports above. There is no need to open `80`.
 
 ## DERP map
@@ -239,8 +220,8 @@ regions:
         regionid: 900
         hostname: derp.example.com
         ipv4: 203.0.113.10
-        derpport: 443          # 8443 if DERP_ADDR=:8443
-        stunport: 3478        # match DERP_STUN_PORT
+        derpport: 8443         # or 443 if DERP_ADDRESS=:443
+        stunport: 3478         # match DERP_STUN_PORT
         canport80: false
 ```
 
@@ -298,7 +279,7 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 ```bash
 # Health probe (HTTPS listener)
-curl -fsS https://derp.example.com/derp/probe
+curl -fsS https://derp.example.com:8443/derp/probe
 
 # Container logs
 docker logs -f derper
@@ -315,16 +296,15 @@ docker exec derper ls -l /var/lib/derper/certs
 | `cert invalid for hostname "..."` | Certificate does not cover `DERP_HOSTNAME` |
 | `cert mismatch with hostname` | Client SNI differs from `DERP_HOSTNAME`; check the DERP map `hostname` |
 | `can not load x509 key pair` | Wrong paths, missing files, or key does not match the certificate |
-| `address already in use` | The `DERP_ADDR` TCP port or `DERP_STUN_PORT` UDP port is taken; change it |
+| `address already in use` | The `DERP_ADDRESS` TCP port or `DERP_STUN_PORT` UDP port is taken; change it |
 | Clients get rejected after Headscale restarts | Expected with fail-closed; wait for the controller or set `DERP_VERIFY_CLIENT_URL_FAIL_OPEN=true` |
 | Clients do not use this DERP | The DERP map has not propagated, or `derpport` is wrong; check `tailscale netcheck` |
 
 ## Security
 
 - DERP relays end-to-end encrypted traffic and cannot read it.
-- Without `DERP_VERIFY_CLIENT_URL` or `DERP_VERIFY_CLIENTS`, the server is an open
-  relay for any tailnet that adds it. Public deployments should configure
-  verification.
+- Without `DERP_VERIFY_CLIENT_URL`, the server is an open relay for any tailnet
+  that adds it. Public deployments should configure verification.
 - The container runs as root so it can bind ports below 1024. To drop privileges,
   set `user:` and `cap_add: [NET_BIND_SERVICE]` in compose, and make
   `/var/lib/derper` writable by that user.

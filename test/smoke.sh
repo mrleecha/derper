@@ -66,10 +66,8 @@ docker run -d --name "$CONTAINER" \
     -e DERP_HOSTNAME=derper.test \
     -e DERP_CERT_FILE=/certs-source/source.crt \
     -e DERP_KEY_FILE=/certs-source/source.key \
-    -e DERP_ADDR=:8443 \
     -e DERP_STUN=true \
     -e DERP_STUN_PORT=3479 \
-    -e DERP_VERIFY_CLIENTS=false \
     -e DERP_VERIFY_CLIENT_URL=https://127.0.0.1:1/verify \
     -v "$TMP_CERTS/source.crt:/certs-source/source.crt:ro" \
     -v "$TMP_CERTS/source.key:/certs-source/source.key:ro" \
@@ -103,6 +101,7 @@ echo "==> checking flags passed to derper"
 cmdline="$(docker exec "$CONTAINER" sh -c 'tr "\0" " " < /proc/1/cmdline')"
 for expected in \
     "--certmode=manual" \
+    "--a=:8443" \
     "--http-port=-1" \
     "--stun=true" \
     "--stun-port=3479" \

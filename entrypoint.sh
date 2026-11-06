@@ -36,16 +36,15 @@ fi
 DERP_HOSTNAME="${DERP_HOSTNAME:-}"
 DERP_CERT_FILE="${DERP_CERT_FILE:-}"
 DERP_KEY_FILE="${DERP_KEY_FILE:-}"
-DERP_ADDR="${DERP_ADDR:-:443}"
+DERP_ADDRESS="${DERP_ADDRESS:-:8443}"
 DERP_STUN="${DERP_STUN:-true}"
 DERP_STUN_PORT="${DERP_STUN_PORT:-3478}"
-DERP_VERIFY_CLIENTS="${DERP_VERIFY_CLIENTS:-false}"
 DERP_VERIFY_CLIENT_URL="${DERP_VERIFY_CLIENT_URL:-}"
 DERP_VERIFY_CLIENT_URL_FAIL_OPEN="${DERP_VERIFY_CLIENT_URL_FAIL_OPEN:-false}"
 DERP_EXTRA_ARGS="${DERP_EXTRA_ARGS:-}"
 
 [ -n "$DERP_HOSTNAME" ] || die "DERP_HOSTNAME is required"
-[ -n "$DERP_ADDR" ] || die "DERP_ADDR must not be empty"
+[ -n "$DERP_ADDRESS" ] || die "DERP_ADDRESS must not be empty"
 [ -n "$DERP_CERT_FILE" ] || die "DERP_CERT_FILE is required (this image is manual-cert only)"
 [ -n "$DERP_KEY_FILE" ] || die "DERP_KEY_FILE is required (this image is manual-cert only)"
 
@@ -62,12 +61,8 @@ case "$DERP_VERIFY_CLIENT_URL" in
     *) die "DERP_VERIFY_CLIENT_URL must be an http(s) URL: $DERP_VERIFY_CLIENT_URL" ;;
 esac
 
-if [ -z "$DERP_VERIFY_CLIENT_URL" ] && [ "$DERP_VERIFY_CLIENTS" != "true" ]; then
-    log "warning: no client verification configured; this DERP will accept any client"
-fi
-
-if [ "$DERP_VERIFY_CLIENTS" = "true" ] && [ ! -S /var/run/tailscale/tailscaled.sock ]; then
-    log "warning: DERP_VERIFY_CLIENTS=true but /var/run/tailscale/tailscaled.sock is missing; mount the socket (or pass --socket via DERP_EXTRA_ARGS)"
+if [ -z "$DERP_VERIFY_CLIENT_URL" ]; then
+    log "warning: DERP_VERIFY_CLIENT_URL is empty; this DERP will accept any client"
 fi
 
 # Must match cmd/derper/cert.go's unsafeHostnameCharacters: [^a-zA-Z0-9-.]
@@ -105,13 +100,13 @@ set -- \
     "--hostname=$DERP_HOSTNAME" \
     "--certmode=manual" \
     "--certdir=$CERT_DIR" \
-    "--a=$DERP_ADDR" \
+    "--a=$DERP_ADDRESS" \
     "--http-port=-1" \
     "--stun=$DERP_STUN" \
     "--stun-port=$DERP_STUN_PORT" \
     "--derp=true" \
     "-c=$CONFIG_FILE" \
-    "--verify-clients=$DERP_VERIFY_CLIENTS" \
+    "--verify-clients=false" \
     "--verify-client-url=$DERP_VERIFY_CLIENT_URL" \
     "--verify-client-url-fail-open=$DERP_VERIFY_CLIENT_URL_FAIL_OPEN"
 
@@ -121,6 +116,6 @@ if [ -n "$DERP_EXTRA_ARGS" ]; then
     set -- "$@" $DERP_EXTRA_ARGS
 fi
 
-log "starting: hostname=$DERP_HOSTNAME addr=$DERP_ADDR stun=$DERP_STUN stun_port=$DERP_STUN_PORT verify_clients=$DERP_VERIFY_CLIENTS verify_client_url=${DERP_VERIFY_CLIENT_URL:-<none>} fail_open=$DERP_VERIFY_CLIENT_URL_FAIL_OPEN"
+log "starting: hostname=$DERP_HOSTNAME addr=$DERP_ADDRESS stun=$DERP_STUN stun_port=$DERP_STUN_PORT verify_client_url=${DERP_VERIFY_CLIENT_URL:-<none>} fail_open=$DERP_VERIFY_CLIENT_URL_FAIL_OPEN"
 
 exec /usr/local/bin/derper "$@"
