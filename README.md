@@ -39,16 +39,8 @@ acme.sh --install-cert -d example.com --ecc \
   --reloadcmd      "docker compose -f /srv/derper/compose.yaml restart derper"
 ```
 
-Create `/srv/derper/.env`:
-
-```dotenv
-DERP_HOSTNAME=derp.example.com
-DERP_CERT_FILE=/certs/fullchain.cer
-DERP_KEY_FILE=/certs/derp.example.com.key
-DERP_ADDRESS=:8443
-```
-
-Create `/srv/derper/compose.yaml`:
+Create `/srv/derper/compose.yaml` (or copy the one from this repository) and
+set the hostname, certificate paths, and optional verification URL:
 
 ```yaml
 services:
@@ -59,7 +51,12 @@ services:
     container_name: derper
     restart: unless-stopped
     network_mode: host
-    env_file: .env
+    environment:
+      DERP_HOSTNAME: derp.example.com
+      DERP_CERT_FILE: /certs/fullchain.cer
+      DERP_KEY_FILE: /certs/derp.example.com.key
+      DERP_ADDRESS: ":8443"
+      # DERP_VERIFY_CLIENT_URL: https://hs.example.com/verify
     volumes:
       - ./certs:/certs:ro
       - ./data:/var/lib/derper

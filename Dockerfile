@@ -33,9 +33,10 @@ COPY --from=build /go/bin/derper /usr/local/bin/derper
 COPY entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod 0755 /usr/local/bin/derper /usr/local/bin/docker-entrypoint.sh
 
-# The HTTPS listener is DERP_ADDR (443 by default); STUN is 3478/udp.
+# The HTTPS listener is DERP_ADDRESS (8443 by default); STUN is 3478/udp.
+# Set DERP_ADDRESS=:443 if you want the standard HTTPS port instead.
 # The HTTP :80 listener is deliberately disabled (--http-port=-1).
-EXPOSE 443/tcp 3478/udp
+EXPOSE 8443/tcp 3478/udp
 
 STOPSIGNAL SIGTERM
 

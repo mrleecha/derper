@@ -10,8 +10,18 @@ services:
     # On Linux this is the recommended mode; do not also set `ports:`.
     network_mode: host
 
-    env_file:
-      - .env
+    environment:
+      DERP_HOSTNAME: derp.example.com
+      DERP_CERT_FILE: /certs/fullchain.cer
+      DERP_KEY_FILE: /certs/derp.example.com.key
+      DERP_ADDRESS: ":8443"
+
+      # Optional:
+      # DERP_STUN: "true"
+      # DERP_STUN_PORT: "3478"
+      # DERP_VERIFY_CLIENT_URL: https://hs.example.com/verify
+      # DERP_VERIFY_CLIENT_URL_FAIL_OPEN: "false"
+      # DERP_EXTRA_ARGS: ""
 
     volumes:
       # Certificate sources (read-only).
