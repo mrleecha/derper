@@ -1,0 +1,37 @@
+name: derper
+
+services:
+  derper:
+    image: ghcr.io/mrleecha/derper:latest
+    container_name: derper
+    restart: unless-stopped
+
+    # DERP needs real client source IPs and direct UDP for STUN.
+    # On Linux this is the recommended mode; do not also set `ports:`.
+    network_mode: host
+
+    env_file:
+      - .env
+
+    # To verify clients with a local tailscaled instead of an admission URL:
+    # environment:
+    #   DERP_VERIFY_CLIENTS: "true"
+    # volumes:
+    #   - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
+
+    volumes:
+      # Certificate sources (read-only).
+      - ./certs:/certs:ro
+      # Persistent derper node key + the normalized certificate copies.
+      - ./data:/var/lib/derper
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Bridge-network fallback (not recommended: source IPs are NATed):
+    # ports:
+    #   - "443:443/tcp"     # or your DERP_ADDR port
+    #   - "3478:3478/udp"
